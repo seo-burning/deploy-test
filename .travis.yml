@@ -1,0 +1,48 @@
+language: python
+python:
+  - "3.6"
+
+services:
+  - docker
+
+before_script: pip install docker-compose
+
+script:
+  - docker-compose run app sh -c "python manage.py test && flake8"
+
+branches:
+  only:
+    - master
+before_deploy: # 배포하기전 하는 작업들
+  - zip -r kim-project * # kim-project 라는 이름으로 zip 파일 생성
+  - mkdir -p deploy # deploy 라는 디렉터리를 만듬
+  - mv kim-project.zip deploy/kim-project.zip # deploy 디렉터리로 kim-project.zip 파일을 이동
+deploy: # 배포
+  - provider: s3 # AWS S3를 의미
+    access_key_id: $AWS_ACCESS_KEY # Travis repo settings에 설정된 값
+    secret_access_key: $AWS_SECRET_KEY # Travis repo settings에 설정된 값
+    bucket: kim-project # S3에 생성한 버킷
+    region: ap-northeast-2
+    skip_cleanup: true
+    local_dir: deploy # deploy 디렉터리에 있는 파일을 s3로 업로드 하겠다는 의미
+    wait-until-deployed: true
+    on:
+      repo: seo-burning/korean-influ-man #Github 주소
+      branch: master
+  - provider: codedeploy # AWS CodeDeploy를 의미
+    access_key_id: $AWS_ACCESS_KEY # Travis repo settings에 설정된 값
+    secret_access_key: $AWS_SECRET_KEY # Travis repo settings에 설정된 값
+    bucket: kim-project # AWS CodeDeploy가 다운로드 받은 버킷
+    key: kim-project.zip # 해당 버킷에 저장되어 있는 파일 이름
+    bundle_type: zip # 버킷에 저장되어 있는 파일의 확장자
+    application: travisci-code-deploy # AWS 배포 애플리케이션
+    deployment_group: travisci-code-deploy-group # AWS 배포 애플리케이션에 만들어져 있는 배포 그룹
+    region: ap-northeast-2
+    wait-until-deployed: true
+    on:
+      repo: seo-burning/korean-influ-man
+      branch: master
+notifications:
+  email:
+    recipients:
+      - su.seo@burningb.com
